@@ -154,6 +154,7 @@ class BrailleLearner:
         print("\n=== Microphone Test Mode ===")
         print("Speak letters or commands. Press Ctrl+C to stop.\n")
 
+        assert self.recognizer is not None, "Recognizer not initialized"
         self.recognizer.test_microphone(duration=30.0)
 
     def _run_level_meter(self):
@@ -166,6 +167,9 @@ class BrailleLearner:
 
     def _run_normal(self):
         """Main learning loop."""
+        assert self.recognizer is not None, "Recognizer not initialized"
+        assert self.tts is not None, "TTS not initialized"
+
         while self.running:
             try:
                 # Listen for speech
@@ -208,6 +212,10 @@ class BrailleLearner:
         3. Wait for DISPLAY_DURATION
         4. Reset display
         """
+        # Type assertions for optional attributes
+        assert self.tts is not None, "TTS not initialized"
+        assert self.display is not None, "Display not initialized"
+
         # Get pattern
         pattern = get_braille_pattern(char)
         if pattern is None:

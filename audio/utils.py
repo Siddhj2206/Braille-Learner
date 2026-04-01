@@ -5,16 +5,20 @@ Designed to be robust and avoid common pitfalls (NaN, overflow, etc.).
 """
 
 import time
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 import numpy as np
 
-try:
-    import pyaudio
+# Type annotation for optional pyaudio module
+pyaudio: Any = None
 
+# Try to import pyaudio, but make it optional
+try:
+    import pyaudio as _pyaudio_module
+
+    pyaudio = _pyaudio_module
     PYAUDIO_AVAILABLE = True
 except ImportError:
     PYAUDIO_AVAILABLE = False
-    pyaudio = None
 
 
 def list_audio_devices() -> List[Dict]:
@@ -182,7 +186,7 @@ def detect_best_sample_rate(device_index: Optional[int] = None) -> int:
         common_rates = [16000, 22050, 44100, 48000]
 
         for rate in common_rates:
-            if _test_sample_rate(p, device_index, rate):
+            if device_index is not None and _test_sample_rate(p, device_index, rate):
                 return rate
 
         # Fallback to safe default

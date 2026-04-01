@@ -7,28 +7,32 @@ Uses constrained vocabulary for deterministic, fast recognition.
 import json
 import time
 from pathlib import Path
-from typing import Optional, List, Dict
-import config
-
-# Optional imports - fail gracefully if not available
-try:
-    import vosk
-
-    VOSK_AVAILABLE = True
-except ImportError:
-    VOSK_AVAILABLE = False
-    vosk = None
-
-try:
-    import pyaudio
-
-    PYAUDIO_AVAILABLE = True
-except ImportError:
-    PYAUDIO_AVAILABLE = False
-    pyaudio = None
+from typing import Optional, List, Dict, Any
 
 from speech.intent import build_vosk_grammar
 from audio.utils import get_default_input_device
+import config
+
+# Type annotations for optional modules
+vosk: Any = None
+pyaudio: Any = None
+
+# Optional imports - fail gracefully if not available
+try:
+    import vosk as _vosk_module
+
+    vosk = _vosk_module
+    VOSK_AVAILABLE = True
+except ImportError:
+    VOSK_AVAILABLE = False
+
+try:
+    import pyaudio as _pyaudio_module
+
+    pyaudio = _pyaudio_module
+    PYAUDIO_AVAILABLE = True
+except ImportError:
+    PYAUDIO_AVAILABLE = False
 
 
 class VoskRecognizerError(Exception):

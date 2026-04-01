@@ -71,6 +71,8 @@ class TTSFeedback:
         Args:
             message: Text to speak
         """
+        if not self.enabled or self.engine is None:
+            return
         try:
             if config.VERBOSE_MODE:
                 print(f"[VERBOSE] Speaking: {message}")
