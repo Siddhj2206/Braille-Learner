@@ -231,32 +231,28 @@ class BrailleLearner:
 
         # 3. Audio feedback
         self.tts.speak_letter(char)
-        print(f"Voice feedback: Letter {char.upper()}")
 
         # 4. Wait (timing controlled here, not in display layer)
-        print(f"Displaying for {config.DISPLAY_DURATION} seconds...")
         time.sleep(config.DISPLAY_DURATION)
 
         # 5. Reset display
         self.display.reset()
-        print("\nResetting for next input...\n")
 
     def _print_output(self, char: str, pattern):
         """Print Braille output to console."""
         print(f"\nRecognized: {char.upper()}")
 
-        # ASCII grid
         grid = render_ascii_grid(pattern)
-        print("\nBraille Grid:")
         print(grid)
 
-        # Binary representation
         binary = format_pattern_binary(pattern)
-        print(f"\nPattern: [{binary}]")
+        print(f"Pattern: [{binary}]")
 
-        # Raised dots info
         dots = get_dots_raised(pattern)
         print(f"Dots raised: {dots}")
+
+        pins = [config.SERVO_PINS[d] for d in dots]
+        print(f"GPIO pins: {pins}")
 
     def cleanup(self):
         """Clean up all resources."""
