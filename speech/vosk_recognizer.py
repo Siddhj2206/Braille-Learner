@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from speech.intent import build_vosk_grammar
-from audio.utils import get_default_input_device
+from audio.utils import get_default_input_device, suppress_alsa_noise
 import config
 
 # Type annotations for optional modules
@@ -109,21 +109,15 @@ class VoskLetterRecognizer:
             )
 
         try:
-            self.model = vosk.Model(str(model_dir))
+            with suppress_alsa_noise():
+                self.model = vosk.Model(str(model_dir))
 
-            # Build grammar for letter recognition
-            self._grammar = build_vosk_grammar()
+                self._grammar = build_vosk_grammar()
 
-            if config.VERBOSE_MODE:
-                print(f"[VERBOSE] Loaded Vosk model from {self.model_path}")
-                print(f"[VERBOSE] Grammar size: {len(self._grammar)} phrases")
-
-            # Create recognizer with grammar constraint
-            # Vosk accepts grammar as JSON array
-            grammar_json = json.dumps(self._grammar)
-            self.recognizer = vosk.KaldiRecognizer(
-                self.model, self.sample_rate, grammar_json
-            )
+                grammar_json = json.dumps(self._grammar)
+                self.recognizer = vosk.KaldiRecognizer(
+                    self.model, self.sample_rate, grammar_json
+                )
 
             if config.VERBOSE_MODE:
                 print("[VERBOSE] Vosk recognizer initialized with grammar constraint")
@@ -155,7 +149,8 @@ class VoskLetterRecognizer:
             raise VoskRecognizerError("Recognizer not initialized")
 
         # Open audio stream
-        p = pyaudio.PyAudio()
+        with suppress_alsa_noise():
+            p = pyaudio.PyAudio()
 
         try:
             stream_kwargs = {
@@ -163,13 +158,14 @@ class VoskLetterRecognizer:
                 "channels": 1,
                 "rate": self.sample_rate,
                 "input": True,
-                "frames_per_buffer": 2048,  # Larger buffer for stability
+                "frames_per_buffer": 2048,
             }
 
             if self.device_index is not None:
                 stream_kwargs["input_device_index"] = self.device_index
 
-            stream = p.open(**stream_kwargs)
+            with suppress_alsa_noise():
+                stream = p.open(**stream_kwargs)
             stream.start_stream()
 
             if config.VERBOSE_MODE:
@@ -210,16 +206,13 @@ class VoskLetterRecognizer:
             return None
 
         finally:
-            # Cleanup
             try:
                 stream.stop_stream()
                 stream.close()
             except Exception:
                 pass
-            p.terminate()
-
-            if config.VERBOSE_MODE:
-                print("[VERBOSE] Audio stream closed")
+            with suppress_alsa_noise():
+                p.terminate()
 
     def test_microphone(self, duration: float = 5.0) -> None:
         """
@@ -234,7 +227,8 @@ class VoskLetterRecognizer:
         if not self.recognizer:
             raise VoskRecognizerError("Recognizer not initialized")
 
-        p = pyaudio.PyAudio()
+        with suppress_alsa_noise():
+            p = pyaudio.PyAudio()
 
         try:
             stream_kwargs = {
@@ -248,7 +242,8 @@ class VoskLetterRecognizer:
             if self.device_index is not None:
                 stream_kwargs["input_device_index"] = self.device_index
 
-            stream = p.open(**stream_kwargs)
+            with suppress_alsa_noise():
+                stream = p.open(**stream_kwargs)
             stream.start_stream()
 
             print(f"\n=== Microphone Test ({duration}s) ===")
@@ -290,7 +285,8 @@ class VoskLetterRecognizer:
                 stream.close()
             except Exception:
                 pass
-            p.terminate()
+            with suppress_alsa_noise():
+                p.terminate()
 
     def list_devices(self) -> List[Dict]:
         """
@@ -302,14 +298,14 @@ class VoskLetterRecognizer:
         if not PYAUDIO_AVAILABLE:
             raise VoskRecognizerError("PyAudio not available")
 
-        p = pyaudio.PyAudio()
+        with suppress_alsa_noise():
+            p = pyaudio.PyAudio()
         devices = []
 
         try:
             for i in range(p.get_device_count()):
                 info = p.get_device_info_by_index(i)
 
-                # Only include input devices
                 if info.get("maxInputChannels", 0) > 0:
                     devices.append(
                         {
@@ -320,7 +316,8 @@ class VoskLetterRecognizer:
                         }
                     )
         finally:
-            p.terminate()
+            with suppress_alsa_noise():
+                p.terminate()
 
         return devices
 
@@ -343,10 +340,11 @@ class VoskLetterRecognizer:
 
         # Show default
         try:
-            p = pyaudio.PyAudio()
-            default = p.get_default_input_device_info()
-            print(f"Default device: [{default['index']}] {default['name']}")
-            p.terminate()
+            with suppress_alsa_noise():
+                p = pyaudio.PyAudio()
+                default = p.get_default_input_device_info()
+                print(f"Default device: [{default['index']}] {default['name']}")
+                p.terminate()
         except Exception:
             pass
 

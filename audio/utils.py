@@ -4,9 +4,25 @@ Functions for device detection, stream creation, and safe RMS calculation.
 Designed to be robust and avoid common pitfalls (NaN, overflow, etc.).
 """
 
+import contextlib
+import os
 import time
 from typing import Optional, List, Dict, Any
 import numpy as np
+
+
+@contextlib.contextmanager
+def suppress_alsa_noise():
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    old_stderr = os.dup(2)
+    os.dup2(devnull, 2)
+    try:
+        yield
+    finally:
+        os.dup2(old_stderr, 2)
+        os.close(devnull)
+        os.close(old_stderr)
+
 
 # Type annotation for optional pyaudio module
 pyaudio: Any = None
@@ -31,14 +47,14 @@ def list_audio_devices() -> List[Dict]:
     if not PYAUDIO_AVAILABLE:
         raise RuntimeError("PyAudio not available")
 
-    p = pyaudio.PyAudio()
+    with suppress_alsa_noise():
+        p = pyaudio.PyAudio()
     devices = []
 
     try:
         for i in range(p.get_device_count()):
             info = p.get_device_info_by_index(i)
 
-            # Only include input devices
             if info.get("maxInputChannels", 0) > 0:
                 devices.append(
                     {
@@ -46,11 +62,10 @@ def list_audio_devices() -> List[Dict]:
                         "name": str(info.get("name", "Unknown")),
                         "sample_rate": int(info.get("defaultSampleRate", 16000)),
                         "channels": int(info.get("maxInputChannels", 0)),
-                        "default": False,  # Will be updated below
+                        "default": False,
                     }
                 )
 
-        # Mark default device
         try:
             default_info = p.get_default_input_device_info()
             default_idx = default_info["index"]
@@ -61,7 +76,8 @@ def list_audio_devices() -> List[Dict]:
             pass
 
     finally:
-        p.terminate()
+        with suppress_alsa_noise():
+            p.terminate()
 
     return devices
 
@@ -76,7 +92,8 @@ def get_default_input_device() -> Optional[Dict]:
     if not PYAUDIO_AVAILABLE:
         return None
 
-    p = pyaudio.PyAudio()
+    with suppress_alsa_noise():
+        p = pyaudio.PyAudio()
 
     try:
         info = p.get_default_input_device_info()
@@ -89,7 +106,8 @@ def get_default_input_device() -> Optional[Dict]:
     except Exception:
         return None
     finally:
-        p.terminate()
+        with suppress_alsa_noise():
+            p.terminate()
 
 
 def calculate_rms(audio_data: bytes) -> float:
@@ -157,17 +175,16 @@ def detect_best_sample_rate(device_index: Optional[int] = None) -> int:
     if not PYAUDIO_AVAILABLE:
         return 16000
 
-    p = pyaudio.PyAudio()
+    with suppress_alsa_noise():
+        p = pyaudio.PyAudio()
 
     try:
-        # Get device info
         if device_index is None:
             try:
                 device_info = p.get_default_input_device_info()
                 device_index = device_info["index"]
                 default_rate = int(device_info.get("defaultSampleRate", 16000))
 
-                # Test if default rate works
                 if _test_sample_rate(p, device_index, default_rate):
                     return default_rate
             except Exception:
@@ -182,21 +199,20 @@ def detect_best_sample_rate(device_index: Optional[int] = None) -> int:
             except Exception:
                 pass
 
-        # Try common rates in order of preference
         common_rates = [16000, 22050, 44100, 48000]
 
         for rate in common_rates:
             if device_index is not None and _test_sample_rate(p, device_index, rate):
                 return rate
 
-        # Fallback to safe default
         return 16000
 
     finally:
-        p.terminate()
+        with suppress_alsa_noise():
+            p.terminate()
 
 
-def _test_sample_rate(p: pyaudio.PyAudio, device_index: int, rate: int) -> bool:
+def _test_sample_rate(p: Any, device_index: int, rate: int) -> bool:
     """
     Test if a sample rate is supported by the device.
 
@@ -247,10 +263,10 @@ class AudioLevelMeter:
             print("PyAudio not available")
             return
 
-        # Detect sample rate
         self.sample_rate = detect_best_sample_rate(self.device_index)
 
-        p = pyaudio.PyAudio()
+        with suppress_alsa_noise():
+            p = pyaudio.PyAudio()
 
         try:
             stream_kwargs = {
@@ -264,7 +280,8 @@ class AudioLevelMeter:
             if self.device_index is not None:
                 stream_kwargs["input_device_index"] = self.device_index
 
-            stream = p.open(**stream_kwargs)
+            with suppress_alsa_noise():
+                stream = p.open(**stream_kwargs)
             stream.start_stream()
 
             print("\n=== Audio Level Meter ===")
@@ -305,4 +322,5 @@ class AudioLevelMeter:
                 stream.close()
             except Exception:
                 pass
-            p.terminate()
+            with suppress_alsa_noise():
+                p.terminate()

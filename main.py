@@ -176,7 +176,8 @@ class BrailleLearner:
                 phrase = self.recognizer.recognize_stream()
 
                 if phrase is None:
-                    # Timeout or no speech detected
+                    if not self.running:
+                        break
                     self.tts.speak_error_unrecognized()
                     print("I didn't understand, please try again\n")
                     continue
